@@ -8,6 +8,7 @@ from mpl_toolkits.basemap import Basemap
 import geopandas as gpd
 import os
 import warnings
+import numpy as np
 
 warnings.filterwarnings('ignore')
 
@@ -18,12 +19,12 @@ class AdvanceGeoApp:
         self.root = root
         self.root.title('Advance Geoprocessing with Satellite Map')
         self.root.geometry('1400x800')
-        # Data layers
+        # Data 
         self.gdf1 = None
         self.gdf2 = None
         self.gdf3 = None
         self.result = None
-        # file path vars
+        # file path
         self.data1_path = tk.StringVar(value='No data')
         self.data2_path = tk.StringVar(value='No data')
         self.data3_path = tk.StringVar(value='No data')
@@ -125,6 +126,8 @@ class AdvanceGeoApp:
             self.m.fillcontinents(color='#2d5016', lake_color='#4d9ff2', alpha=0.6)
 
         self.m.drawcoastlines(linewidth=0.5, color='yellow')
+        self.m.drawparallels(np.arange(-90,90,10), labels=[True, False, False, False], color='white')
+        self.m.drawmeridians(np.arange(-180,180,20), labels=[0,0,0,1], color='white')
         self.m.drawcountries(linewidth=0.5, color='white')
         self.m.drawstates(linewidth=0.3, color='gray', linestyle='--')
         self.m.drawrivers(linewidth=0.3, color='cyan')
@@ -288,7 +291,7 @@ class AdvanceGeoApp:
             return
         try:
             self.result.to_file(file_path)
-            messagebox.showinfo('Success', f'Result saved to {os.path.basename(file_path)}')
+            messagebox.showinfo('Sukses', f'Result saved to {os.path.basename(file_path)}')
         except Exception as e:
             messagebox.showerror('Error', f'Failed to save: {e}')
 
@@ -301,7 +304,7 @@ class AdvanceGeoApp:
         self.data2_path.set('No data')
         self.data3_path.set('No data')
         self.draw_basemap()
-        messagebox.showinfo('Success', 'All layers cleared')
+        messagebox.showinfo('Sukses', 'Semua Layer terhapus')
 
 
 if __name__ == '__main__':
