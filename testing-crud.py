@@ -36,11 +36,11 @@ class GISApp:
         main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # Left panel with scrollbar
-        left_container = tk.Frame(main_frame, width=300, relief=tk.RAISED, borderwidth=2)
+        left_container = tk.Frame(main_frame, width=200, relief=tk.RAISED, borderwidth=2)
         left_container.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 5))
         left_container.pack_propagate(False)
         
-        # Right panel with scrollbar
+        # Right panel WITHOUT scrollbar (regular overflow only)
         right_panel_container = tk.Frame(main_frame, width=350, relief=tk.RAISED, borderwidth=2)
         right_panel_container.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
         right_panel_container.pack_propagate(False)
@@ -62,34 +62,17 @@ class GISApp:
         left_canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Enable mousewheel scrolling
-        def _on_mousewheel(event):
+        # Enable mousewheel scrolling for LEFT PANEL ONLY
+        def _on_mousewheel_left(event):
             left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        left_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        # Bind mousewheel to left canvas only
+        left_canvas.bind("<Enter>", lambda e: left_canvas.bind_all("<MouseWheel>", _on_mousewheel_left))
+        left_canvas.bind("<Leave>", lambda e: left_canvas.unbind_all("<MouseWheel>"))
         
-        # Create canvas and scrollbar for right panel
-        right_canvas = tk.Canvas(right_panel_container, width=330)
-        right_scrollbar = tk.Scrollbar(right_panel_container, orient="vertical", command=right_canvas.yview)
-        right_panel = tk.Frame(right_canvas)
-        
-        right_panel.bind(
-            "<Configure>",
-            lambda e: right_canvas.configure(scrollregion=right_canvas.bbox("all"))
-        )
-        
-        right_canvas.create_window((0, 0), window=right_panel, anchor="nw")
-        right_canvas.configure(yscrollcommand=right_scrollbar.set)
-        
-        # Pack canvas and scrollbar for right panel
-        right_canvas.pack(side="left", fill="both", expand=True)
-        right_scrollbar.pack(side="right", fill="y")
-        
-        # Enable mousewheel scrolling for right panel
-        def _on_mousewheel_right(event):
-            right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        right_canvas.bind_all("<MouseWheel>", _on_mousewheel_right)
+        # RIGHT PANEL - Simple frame without mouse wheel scrolling
+        right_panel = tk.Frame(right_panel_container)
+        right_panel.pack(fill="both", expand=True)
         
         # Right side container
         right_container = tk.Frame(main_frame)
@@ -196,12 +179,12 @@ class GISApp:
                  bg="#F44336", fg="white", width=20).pack(pady=2)
     
     def setup_right_panel(self, parent):
-        # Result Panel
+        # Result Panel - NO SCROLLBAR for mouse wheel
         result_frame = tk.LabelFrame(parent, text="RESULT - Feature Attributes", padx=10, pady=10,
                                      font=('Arial', 10, 'bold'))
         result_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # ScrolledText for displaying results
+        # ScrolledText for displaying results (scrollbar is there, but no mouse wheel binding)
         self.result_text = scrolledtext.ScrolledText(result_frame, 
                                                       wrap=tk.WORD, 
                                                       width=40, 
@@ -473,12 +456,27 @@ class GISApp:
             self.result_text.insert(tk.END, f"Area (ha): {row['area_ha']:.4f}\n")
             self.result_text.insert(tk.END, f"CRS: {self.current_crs}\n")
             
-            # Display full coordinates
+            # ENHANCED: Display ALL coordinates for polygons with 2+ vertices
             if hasattr(row['geometry'], 'coords'):
                 coord_list = list(row['geometry'].coords)
-                self.result_text.insert(tk.END, f"Coordinates:\n")
+                self.result_text.insert(tk.END, f"Coordinates ({len(coord_list)} points):\n")
                 for i, coord in enumerate(coord_list):
                     self.result_text.insert(tk.END, f"  {i+1}. ({coord[0]:.6f}, {coord[1]:.6f})\n")
+            elif row['geometry'].geom_type == 'Polygon':
+                # For Polygon, get exterior coordinates
+                coord_list = list(row['geometry'].exterior.coords)
+                self.result_text.insert(tk.END, f"Polygon Coordinates ({len(coord_list)} vertices):\n")
+                for i, coord in enumerate(coord_list):
+                    self.result_text.insert(tk.END, f"  {i+1}. ({coord[0]:.6f}, {coord[1]:.6f})\n")
+                
+                # If polygon has interior rings (holes), display them too
+                if len(row['geometry'].interiors) > 0:
+                    self.result_text.insert(tk.END, f"\nInterior Rings (Holes): {len(row['geometry'].interiors)}\n")
+                    for ring_idx, interior in enumerate(row['geometry'].interiors):
+                        interior_coords = list(interior.coords)
+                        self.result_text.insert(tk.END, f"  Ring {ring_idx+1} ({len(interior_coords)} points):\n")
+                        for i, coord in enumerate(interior_coords):
+                            self.result_text.insert(tk.END, f"    {i+1}. ({coord[0]:.6f}, {coord[1]:.6f})\n")
             else:
                 self.result_text.insert(tk.END, f"Geometry: {row['geometry']}\n")
             
