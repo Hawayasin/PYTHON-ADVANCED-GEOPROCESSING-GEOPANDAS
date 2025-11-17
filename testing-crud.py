@@ -40,6 +40,11 @@ class GISApp:
         left_container.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 5))
         left_container.pack_propagate(False)
         
+        # Right panel with scrollbar
+        right_panel_container = tk.Frame(main_frame, width=350, relief=tk.RAISED, borderwidth=2)
+        right_panel_container.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
+        right_panel_container.pack_propagate(False)
+        
         # Create canvas and scrollbar for left panel
         left_canvas = tk.Canvas(left_container, width=280)
         scrollbar = tk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
@@ -63,6 +68,29 @@ class GISApp:
         
         left_canvas.bind_all("<MouseWheel>", _on_mousewheel)
         
+        # Create canvas and scrollbar for right panel
+        right_canvas = tk.Canvas(right_panel_container, width=330)
+        right_scrollbar = tk.Scrollbar(right_panel_container, orient="vertical", command=right_canvas.yview)
+        right_panel = tk.Frame(right_canvas)
+        
+        right_panel.bind(
+            "<Configure>",
+            lambda e: right_canvas.configure(scrollregion=right_canvas.bbox("all"))
+        )
+        
+        right_canvas.create_window((0, 0), window=right_panel, anchor="nw")
+        right_canvas.configure(yscrollcommand=right_scrollbar.set)
+        
+        # Pack canvas and scrollbar for right panel
+        right_canvas.pack(side="left", fill="both", expand=True)
+        right_scrollbar.pack(side="right", fill="y")
+        
+        # Enable mousewheel scrolling for right panel
+        def _on_mousewheel_right(event):
+            right_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        right_canvas.bind_all("<MouseWheel>", _on_mousewheel_right)
+        
         # Right side container
         right_container = tk.Frame(main_frame)
         right_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -76,6 +104,7 @@ class GISApp:
         table_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, padx=(0, 0), pady=(5, 0))
         
         self.setup_left_panel(left_frame)
+        self.setup_right_panel(right_panel)
         self.setup_map_panel(map_frame)
         self.setup_table_panel(table_frame)
         
@@ -149,19 +178,6 @@ class GISApp:
                  command=self.calculate_geometry,
                  bg="#009688", fg="white", width=20).pack(pady=5)
         
-        # Spatial Operations Panel
-        ops_frame = tk.LabelFrame(parent, text="Spatial Operations", padx=10, pady=10,
-                                  font=('Arial', 10, 'bold'))
-        ops_frame.pack(fill=tk.X, padx=5, pady=5)
-        
-        tk.Button(ops_frame, text="Buffer +10m", 
-                 command=lambda: self.buffer_operation(10),
-                 bg="#795548", fg="white", width=20).pack(pady=2)
-        
-        tk.Button(ops_frame, text="Buffer +5m", 
-                 command=lambda: self.buffer_operation(5),
-                 bg="#795548", fg="white", width=20).pack(pady=2)
-        
         # CRS Operations Panel
         crs_frame = tk.LabelFrame(parent, text="CRS Operations", padx=10, pady=10,
                                   font=('Arial', 10, 'bold'))
@@ -178,6 +194,27 @@ class GISApp:
         tk.Button(crs_frame, text="Clear All Data", 
                  command=self.clear_all_data,
                  bg="#F44336", fg="white", width=20).pack(pady=2)
+    
+    def setup_right_panel(self, parent):
+        # Result Panel
+        result_frame = tk.LabelFrame(parent, text="RESULT - Feature Attributes", padx=10, pady=10,
+                                     font=('Arial', 10, 'bold'))
+        result_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # ScrolledText for displaying results
+        self.result_text = scrolledtext.ScrolledText(result_frame, 
+                                                      wrap=tk.WORD, 
+                                                      width=40, 
+                                                      height=35,
+                                                      font=('Courier', 9),
+                                                      bg='#f9f9f9',
+                                                      fg='#333333')
+        self.result_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Initial message
+        self.result_text.insert(tk.END, "Click 'Refresh Table' to display feature attributes\n")
+        self.result_text.insert(tk.END, "=" * 45 + "\n\n")
+        self.result_text.config(state=tk.DISABLED)
         
     def setup_map_panel(self, parent):
         # Title
@@ -398,52 +435,67 @@ class GISApp:
         for item in self.tree.get_children():
             self.tree.delete(item)
         
-        # Populate table
+        # Clear result text
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        
+        if self.gdf.empty:
+            self.result_text.insert(tk.END, "No features available\n")
+            self.result_text.insert(tk.END, "=" * 45 + "\n")
+            self.result_text.config(state=tk.DISABLED)
+            return
+        
+        # Header for result
+        self.result_text.insert(tk.END, "FEATURE ATTRIBUTES\n")
+        self.result_text.insert(tk.END, "=" * 45 + "\n\n")
+        
+        # Populate table and result text
         for idx, row in self.gdf.iterrows():
             coords = str(row['geometry'].coords[:] if hasattr(row['geometry'], 'coords') else row['geometry'])
             if len(coords) > 50:
-                coords = coords[:50] + "..."
+                coords_display = coords[:50] + "..."
+            else:
+                coords_display = coords
             
+            # Add to table
             self.tree.insert('', tk.END, values=(
                 row['id'],
                 row['type'],
                 f"{row['area_m2']:.2f}",
                 f"{row['area_ha']:.4f}",
-                coords
+                coords_display
             ))
-    
-    def buffer_operation(self, distance):
-        if self.gdf.empty:
-            messagebox.showinfo("Info", "No geometries to buffer")
-            return
-        
-        try:
-            for idx, row in self.gdf.iterrows():
-                if self.current_crs == "EPSG:4326":
-                    # Convert meters to degrees (approximate)
-                    distance_deg = distance / 111320
-                    buffered = row['geometry'].buffer(distance_deg)
-                else:
-                    buffered = row['geometry'].buffer(distance)
-                
-                area_m2, area_ha = self.calculate_area(buffered)
-                
-                new_row = gpd.GeoDataFrame({
-                    'id': [self.current_id],
-                    'type': [f"Buffer+{distance}m"],
-                    'geometry': [buffered],
-                    'area_m2': [area_m2],
-                    'area_ha': [area_ha]
-                }, crs=self.current_crs)
-                
-                self.gdf = pd.concat([self.gdf, new_row], ignore_index=True)
-                self.current_id += 1
             
-            self.update_map()
-            self.read_data()
-            messagebox.showinfo("Success", f"Buffer +{distance}m applied to all features")
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+            # Add to result text
+            self.result_text.insert(tk.END, f"Feature ID: {row['id']}\n")
+            self.result_text.insert(tk.END, f"Type: {row['type']}\n")
+            self.result_text.insert(tk.END, f"Area (m²): {row['area_m2']:.2f}\n")
+            self.result_text.insert(tk.END, f"Area (ha): {row['area_ha']:.4f}\n")
+            self.result_text.insert(tk.END, f"CRS: {self.current_crs}\n")
+            
+            # Display full coordinates
+            if hasattr(row['geometry'], 'coords'):
+                coord_list = list(row['geometry'].coords)
+                self.result_text.insert(tk.END, f"Coordinates:\n")
+                for i, coord in enumerate(coord_list):
+                    self.result_text.insert(tk.END, f"  {i+1}. ({coord[0]:.6f}, {coord[1]:.6f})\n")
+            else:
+                self.result_text.insert(tk.END, f"Geometry: {row['geometry']}\n")
+            
+            self.result_text.insert(tk.END, "-" * 45 + "\n\n")
+        
+        # Summary
+        total_features = len(self.gdf)
+        total_area_m2 = self.gdf['area_m2'].sum()
+        total_area_ha = self.gdf['area_ha'].sum()
+        
+        self.result_text.insert(tk.END, "SUMMARY\n")
+        self.result_text.insert(tk.END, "=" * 45 + "\n")
+        self.result_text.insert(tk.END, f"Total Features: {total_features}\n")
+        self.result_text.insert(tk.END, f"Total Area (m²): {total_area_m2:.2f}\n")
+        self.result_text.insert(tk.END, f"Total Area (ha): {total_area_ha:.4f}\n")
+        
+        self.result_text.config(state=tk.DISABLED)
     
     def convert_to_utm(self):
         if self.gdf.empty:
@@ -496,6 +548,13 @@ class GISApp:
             self.calc_label.config(text="Luasan:\n- m²: 0\n- ha: 0")
             self.status_label.config(text="Ready")
             
+            # Clear result text
+            self.result_text.config(state=tk.NORMAL)
+            self.result_text.delete(1.0, tk.END)
+            self.result_text.insert(tk.END, "All data cleared\n")
+            self.result_text.insert(tk.END, "=" * 45 + "\n")
+            self.result_text.config(state=tk.DISABLED)
+            
             # Reset button colors
             self.btn_point.config(bg="#4CAF50")
             self.btn_line.config(bg="#2196F3")
@@ -522,13 +581,9 @@ class GISApp:
             colors = {'Point': 'red', 'Line': 'blue', 'Polygon': 'green'}
             
             for idx, row in self.gdf.iterrows():
-                geom_type = row['type'].split('+')[0].replace('Buffer', '').strip()
-                if 'Buffer' in row['type']:
-                    color = 'orange'
-                    alpha = 0.3
-                else:
-                    color = colors.get(geom_type, 'purple')
-                    alpha = 0.5
+                geom_type = row['type']
+                color = colors.get(geom_type, 'purple')
+                alpha = 0.5
                 
                 geom = row['geometry']
                 
