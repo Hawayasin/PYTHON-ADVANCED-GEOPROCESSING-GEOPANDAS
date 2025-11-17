@@ -17,13 +17,13 @@ class GISApp:
         self.root.title("GIS Spatial Operations - Interactive Drawing")
         self.root.geometry("1600x900")
         
-        # Data storage
+        # Penyimpanan Data
         self.gdf = gpd.GeoDataFrame(columns=['id', 'type', 'geometry', 'area_m2', 'area_ha'], 
-                                     geometry='geometry', crs="EPSG:4326")
+                                    geometry='geometry', crs="EPSG:4326")
         self.current_id = 0
         self.current_crs = "EPSG:4326"
         
-        # Drawing state
+        # Penggambaran Sementara
         self.drawing_mode = None  # 'point', 'line', 'polygon'
         self.temp_points = []
         self.is_drawing = False
@@ -31,21 +31,21 @@ class GISApp:
         self.setup_ui()
         
     def setup_ui(self):
-        # Main container
+        # Konten utama
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Left panel with scrollbar
+        # Panel konten kiri menggunakan scrollbar (untuk overflow konten)
         left_container = tk.Frame(main_frame, width=200, relief=tk.RAISED, borderwidth=2)
         left_container.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 5))
         left_container.pack_propagate(False)
         
-        # Right panel WITHOUT scrollbar (regular overflow only)
+        # Panel kanan tampa scrollbar
         right_panel_container = tk.Frame(main_frame, width=350, relief=tk.RAISED, borderwidth=2)
         right_panel_container.pack(side=tk.RIGHT, fill=tk.Y, padx=(5, 0))
         right_panel_container.pack_propagate(False)
         
-        # Create canvas and scrollbar for left panel
+        # Panel kiri dengan scrollbar
         left_canvas = tk.Canvas(left_container, width=280)
         scrollbar = tk.Scrollbar(left_container, orient="vertical", command=left_canvas.yview)
         left_frame = tk.Frame(left_canvas)
@@ -58,23 +58,22 @@ class GISApp:
         left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
         left_canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Pack canvas and scrollbar
+        # Scrollar panel kanan 
         left_canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
         
-        # Enable mousewheel scrolling for LEFT PANEL ONLY
+        # Fungsi untuk menghandle mouse wheel pada panel kiri, tkinter handling berkebalikan dengan perintah 
         def _on_mousewheel_left(event):
             left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        # Bind mousewheel to left canvas only
+        # Mouse whell akan binding ketika crusor di taruh di sebelah kiri
         left_canvas.bind("<Enter>", lambda e: left_canvas.bind_all("<MouseWheel>", _on_mousewheel_left))
         left_canvas.bind("<Leave>", lambda e: left_canvas.unbind_all("<MouseWheel>"))
         
-        # RIGHT PANEL - Simple frame without mouse wheel scrolling
+        # Setting PANEL KANAN 
         right_panel = tk.Frame(right_panel_container)
         right_panel.pack(fill="both", expand=True)
         
-        # Right side container
+        # Kontainer PANEL KANAN
         right_container = tk.Frame(main_frame)
         right_container.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
@@ -94,43 +93,43 @@ class GISApp:
     def setup_left_panel(self, parent):
         # CREATE Panel
         create_frame = tk.LabelFrame(parent, text="CREATE Feature", padx=10, pady=10, 
-                                     font=('Arial', 10, 'bold'))
+                                    font=('Arial', 10, 'bold'))
         create_frame.pack(fill=tk.X, padx=5, pady=5)
         
         tk.Label(create_frame, text="Click on map to draw:", font=('Arial', 9)).pack(anchor=tk.W, pady=(0, 5))
         
         btn_width = 22
         self.btn_point = tk.Button(create_frame, text="Draw Point", 
-                                   command=lambda: self.set_drawing_mode('point'),
-                                   bg="#4CAF50", fg="white", width=btn_width)
+                                command=lambda: self.set_drawing_mode('point'),
+                                bg="#4CAF50", fg="white", width=btn_width)
         self.btn_point.pack(pady=2)
         
         self.btn_line = tk.Button(create_frame, text="Draw Line", 
-                                  command=lambda: self.set_drawing_mode('line'),
-                                  bg="#2196F3", fg="white", width=btn_width)
+                                command=lambda: self.set_drawing_mode('line'),
+                                bg="#2196F3", fg="white", width=btn_width)
         self.btn_line.pack(pady=2)
         
         self.btn_polygon = tk.Button(create_frame, text="Draw Polygon", 
-                                     command=lambda: self.set_drawing_mode('polygon'),
-                                     bg="#FF9800", fg="white", width=btn_width)
+                                    command=lambda: self.set_drawing_mode('polygon'),
+                                    bg="#FF9800", fg="white", width=btn_width)
         self.btn_polygon.pack(pady=2)
         
         tk.Button(create_frame, text="Finish Drawing", 
-                 command=self.finish_drawing,
-                 bg="#9C27B0", fg="white", width=btn_width).pack(pady=5)
+                command=self.finish_drawing,
+                bg="#9C27B0", fg="white", width=btn_width).pack(pady=5)
         
         tk.Label(create_frame, text="Status:", font=('Arial', 9, 'bold')).pack(anchor=tk.W, pady=(10, 0))
         self.status_label = tk.Label(create_frame, text="Ready", fg="green", 
-                                     font=('Arial', 8), wraplength=250, justify=tk.LEFT)
+                                    font=('Arial', 8), wraplength=250, justify=tk.LEFT)
         self.status_label.pack(anchor=tk.W)
         
         # READ Panel
         read_frame = tk.LabelFrame(parent, text="READ Data", padx=10, pady=10,
-                                   font=('Arial', 10, 'bold'))
+                                font=('Arial', 10, 'bold'))
         read_frame.pack(fill=tk.X, padx=5, pady=5)
         
         tk.Button(read_frame, text="Refresh Table", command=self.read_data,
-                 bg="#00BCD4", fg="white", width=btn_width).pack(pady=2)
+                bg="#00BCD4", fg="white", width=btn_width).pack(pady=2)
         
         # Add Feature X,Y Panel
         coord_frame = tk.LabelFrame(parent, text="Add Feature X, Y", padx=10, pady=10,
@@ -146,52 +145,52 @@ class GISApp:
         self.y_entry.pack(pady=2)
         
         tk.Button(coord_frame, text="Add Point", command=self.add_point_xy,
-                 bg="#4CAF50", fg="white", width=20).pack(pady=5)
+                bg="#4CAF50", fg="white", width=20).pack(pady=5)
         
         # Calculate Geometry Panel
         calc_frame = tk.LabelFrame(parent, text="Calculate Geometry", padx=10, pady=10,
-                                   font=('Arial', 10, 'bold'))
+                                font=('Arial', 10, 'bold'))
         calc_frame.pack(fill=tk.X, padx=5, pady=5)
         
         self.calc_label = tk.Label(calc_frame, text="Luasan:\n- m²: 0\n- ha: 0", 
-                                   justify=tk.LEFT, fg="blue", font=('Arial', 9))
+                                justify=tk.LEFT, fg="blue", font=('Arial', 9))
         self.calc_label.pack(anchor=tk.W)
         
         tk.Button(calc_frame, text="Calculate All Features", 
-                 command=self.calculate_geometry,
-                 bg="#009688", fg="white", width=20).pack(pady=5)
+                command=self.calculate_geometry,
+                bg="#009688", fg="white", width=20).pack(pady=5)
         
         # CRS Operations Panel
         crs_frame = tk.LabelFrame(parent, text="CRS Operations", padx=10, pady=10,
-                                  font=('Arial', 10, 'bold'))
+                                font=('Arial', 10, 'bold'))
         crs_frame.pack(fill=tk.X, padx=5, pady=5)
         
         tk.Button(crs_frame, text="WGS84 → UTM", 
-                 command=self.convert_to_utm,
-                 bg="#3F51B5", fg="white", width=20).pack(pady=2)
+                command=self.convert_to_utm,
+                bg="#3F51B5", fg="white", width=20).pack(pady=2)
         
         self.crs_label = tk.Label(crs_frame, text=f"Current CRS:\n{self.current_crs}", 
-                                 fg="darkblue", font=('Arial', 8), justify=tk.LEFT)
+                                fg="darkblue", font=('Arial', 8), justify=tk.LEFT)
         self.crs_label.pack(anchor=tk.W, pady=5)
         
         tk.Button(crs_frame, text="Clear All Data", 
-                 command=self.clear_all_data,
-                 bg="#F44336", fg="white", width=20).pack(pady=2)
+                command=self.clear_all_data,
+                bg="#F44336", fg="white", width=20).pack(pady=2)
     
     def setup_right_panel(self, parent):
         # Result Panel - NO SCROLLBAR for mouse wheel
         result_frame = tk.LabelFrame(parent, text="RESULT - Feature Attributes", padx=10, pady=10,
-                                     font=('Arial', 10, 'bold'))
+                                    font=('Arial', 10, 'bold'))
         result_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # ScrolledText for displaying results (scrollbar is there, but no mouse wheel binding)
         self.result_text = scrolledtext.ScrolledText(result_frame, 
-                                                      wrap=tk.WORD, 
-                                                      width=40, 
-                                                      height=35,
-                                                      font=('Courier', 9),
-                                                      bg='#f9f9f9',
-                                                      fg='#333333')
+                                                    wrap=tk.WORD, 
+                                                    width=40, 
+                                                    height=35,
+                                                    font=('Courier', 9),
+                                                    bg='#f9f9f9',
+                                                    fg='#333333')
         self.result_text.pack(fill=tk.BOTH, expand=True)
         
         # Initial message
@@ -202,7 +201,7 @@ class GISApp:
     def setup_map_panel(self, parent):
         # Title
         title_label = tk.Label(parent, text="Interactive Map (Click to Draw)", 
-                              font=('Arial', 11, 'bold'), bg='lightgray')
+                            font=('Arial', 11, 'bold'), bg='lightgray')
         title_label.pack(fill=tk.X, pady=(0, 5))
         
         # Matplotlib figure with Cartopy
@@ -215,7 +214,7 @@ class GISApp:
         self.ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
         self.ax.add_feature(cfeature.BORDERS, linewidth=0.5, linestyle=':')
         self.ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False, 
-                         linewidth=0.5, alpha=0.5)
+                        linewidth=0.5, alpha=0.5)
         
         # Set initial extent (Indonesia region)
         self.ax.set_extent([95, 141, -11, 6], crs=ccrs.PlateCarree())
@@ -236,7 +235,7 @@ class GISApp:
     def setup_table_panel(self, parent):
         # Title
         title_label = tk.Label(parent, text="Data Table", 
-                              font=('Arial', 10, 'bold'), bg='lightgray')
+                            font=('Arial', 10, 'bold'), bg='lightgray')
         title_label.pack(fill=tk.X)
         
         # Create Treeview
@@ -482,7 +481,7 @@ class GISApp:
             
             self.result_text.insert(tk.END, "-" * 45 + "\n\n")
         
-        # Summary
+        # Ringkasan hasil read data 
         total_features = len(self.gdf)
         total_area_m2 = self.gdf['area_m2'].sum()
         total_area_ha = self.gdf['area_ha'].sum()
